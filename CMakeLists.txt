@@ -252,6 +252,11 @@ if(REDIS_PLUS_PLUS_BUILD_STATIC)
     if(REDIS_PLUS_PLUS_BUILD_STATIC_WITH_PIC)
         set_target_properties(${STATIC_LIB} PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
+
+    install(TARGETS ${STATIC_LIB}
+            EXPORT redis++-targets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT development)
 endif()
 
 # Build shared library
@@ -303,6 +308,11 @@ if(REDIS_PLUS_PLUS_BUILD_SHARED)
     set_target_properties(${SHARED_LIB} PROPERTIES CXX_EXTENSIONS OFF)
     set_target_properties(${SHARED_LIB} PROPERTIES POSITION_INDEPENDENT_CODE ON)
     set_target_properties(${SHARED_LIB} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
+
+    install(TARGETS ${SHARED_LIB}
+            EXPORT redis++-targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT shared)
 endif()
 
 option(REDIS_PLUS_PLUS_BUILD_TEST "Build tests for redis++" ON)
@@ -319,19 +329,21 @@ endif()
 
 include(GNUInstallDirs)
 
-install(TARGETS ${REDIS_PLUS_PLUS_TARGETS}
-        EXPORT redis++-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# install(TARGETS ${REDIS_PLUS_PLUS_TARGETS}
+#         EXPORT redis++-targets
+#         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+#         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+#         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+#         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+#         COMPONENT shared)
 
 set(REDIS_PLUS_PLUS_CMAKE_DESTINATION share/cmake/redis++)
 
 install(EXPORT redis++-targets
         FILE redis++-targets.cmake
         NAMESPACE redis++::
-        DESTINATION ${REDIS_PLUS_PLUS_CMAKE_DESTINATION})
+        DESTINATION ${REDIS_PLUS_PLUS_CMAKE_DESTINATION}
+        COMPONENT development)
 
 # Install headers.
 set(HEADER_PATH "sw/redis++")
@@ -352,7 +364,7 @@ if(NOT REDIS_PLUS_PLUS_BUILD_CORO)
     list(REMOVE_ITEM HEADERS ${CORO_HEADERS})
 endif()
 
-install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${HEADER_PATH})
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${HEADER_PATH} COMPONENT development)
 
 file(GLOB PATTERNS_HEADERS "${PATTERNS_DIR}/*.h*")
 install(FILES ${PATTERNS_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${HEADER_PATH}/patterns)
@@ -369,7 +381,8 @@ configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/redis++-config.
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/redis++-config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/cmake/redis++-config-version.cmake"
-        DESTINATION ${REDIS_PLUS_PLUS_CMAKE_DESTINATION})
+        DESTINATION ${REDIS_PLUS_PLUS_CMAKE_DESTINATION}
+        COMPONENT development)
 
 export(EXPORT redis++-targets
         FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/redis++-targets.cmake"
@@ -379,26 +392,46 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/redis++.pc.in"
         "${CMAKE_CURRENT_BINARY_DIR}/cmake/redis++.pc" @ONLY)
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake/redis++.pc"
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+        COMPONENT development)
 
 # All the Debian-specific cpack defines.
+include(CPackComponent)
 if(${CMAKE_VERSION} VERSION_GREATER 3.6)
-  SET(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS "ON")
+    SET(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS "ON")
 endif()
-if(NOT DEFINED CPACK_DEBIAN_PACKAGE_DEPENDS)
-  SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libstdc++6, libhiredis-dev")
+SET(CPACK_PACKAGE_VERSION "${REDIS_PLUS_PLUS_VERSION}")
+if(DEFINED CPACK_DEBIAN_PACKAGE_RELEASE)
+    SET(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE}")
 endif()
 SET(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 SET(CPACK_DEBIAN_PACKAGE_VERSION "${REDIS_PLUS_PLUS_VERSION}")
-SET(CPACK_DEBIAN_PACKAGE_SOURCE "https://github.com/sewenew/redis-plus-plus")
+SET(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/sewenew/redis-plus-plus")
 message(STATUS "Debian package name: ${CPACK_PACKAGE_FILE_NAME}.deb")
+
+SET(CPACK_DEBIAN_SHARED_PACKAGE_NAME "libredis++0")
+SET(CPACK_DEBIAN_SHARED_PACKAGE_SHLIBDEPS ON)
+
+SET(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME "libredis++-dev")
+SET(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_DEPENDS "libredis++0 (= ${CPACK_PACKAGE_VERSION}), libhiredis-dev")
+
+# set(CPACK_COMPONENTS_ALL "shared;development")
 
 # All the common cpack defines.
 if(NOT DEFINED CPACK_PACKAGE_NAME)
-    SET(CPACK_PACKAGE_NAME "libredis++-dev")
+    # string(TOLOWER "${CMAKE_PROJECT_NAME}" CPACK_PACKAGE_NAME)
 endif()
 SET(CPACK_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 SET(CPACK_PACKAGE_DESCRIPTION "A pure C++ client for Redis, based on hiredis.")
 SET(CPACK_PACKAGE_CONTACT "anonymous")
+SET(CPACK_STRIP_FILES TRUE)
 SET(CPACK_GENERATOR "DEB")
+SET(CPACK_DEB_COMPONENT_INSTALL ON)
+
 INCLUDE(CPack)
+
+cpack_add_component(shared DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION}")
+cpack_add_component(development DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION}
+-
+This package contains headers and static libraries needed for development."
+)
