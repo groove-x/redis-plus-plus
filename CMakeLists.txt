@@ -415,6 +415,16 @@ SET(CPACK_DEBIAN_SHARED_PACKAGE_SHLIBDEPS ON)
 SET(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME "libredis++-dev")
 SET(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_DEPENDS "libredis++1 (= ${CPACK_PACKAGE_VERSION}), libhiredis-dev")
 
+# Install LICENSE file to /usr/share/doc/<package>/copyright for both packages
+install(FILES "${CMAKE_SOURCE_DIR}/LICENSE"
+        DESTINATION "${CMAKE_INSTALL_DOCDIR}/../libredis++1"
+        RENAME copyright
+        COMPONENT shared)
+install(FILES "${CMAKE_SOURCE_DIR}/LICENSE"
+        DESTINATION "${CMAKE_INSTALL_DOCDIR}/../libredis++-dev"
+        RENAME copyright
+        COMPONENT development)
+
 # All the common cpack defines.
 SET(CPACK_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 SET(CPACK_PACKAGE_DESCRIPTION "A pure C++ client for Redis, based on hiredis.")
